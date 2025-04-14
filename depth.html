@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Temperature vs Depth Profile</title>
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f4f8fb;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background: #0077b6;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #005f87;
+    }
+    #depth-chart {
+      margin-top: 40px;
+      background: white;
+      border-radius: 10px;
+      padding: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Temperature vs Depth Profile</h2>
+  <button onclick="plotDepthProfile()">Load Profile</button>
+  <div id="depth-chart" style="height: 600px;"></div>
+
+  <script>
+    async function plotDepthProfile() {
+      const now = new Date();
+      const start = new Date(now.getTime() - 3 * 60 * 60 * 1000).toISOString();
+      const end = now.toISOString();
+
+      const url = 'https://api.sofarocean.com/api/sensor-data?spotterId=SPOT-30363R&startDate=2024-12-01T07:00:00Z&endDate=2024-12-03T07:00:00&token=9b5b0e8377a2805157c883a7f9d7b3';
+
+      try {
+        const res = await fetch(url);
+        const json = await res.json();
+
+        const temps = json.data.filter(d => d.unit_type === "temperature");
+        console.log("Fetched temperature data:", temps);
+
+        const depths = {
+          1: 3.05,
+          2: 6.10,
+          3: 9.14,
+          4: 12.19
+        };
+
+        const profile = [];
+
+        for (let pos = 1; pos <= 4; pos++) {
+          const sensorData = temps.filter(d => d.sensorPosition === pos);
+          if (sensorData.length > 0) {
+            const latest = sensorData[sensorData.length - 1];
+            profile.push({ x: latest.value, y: depths[pos] });
+          } else {
+            console.warn(`No data for sensor ${pos}`);
+          }
+        }
+
+        if (profile.length === 0) {
+          alert("No live temperature data available. Using fallback sample data.");
+          profile.push(
+            { x: 20.1, y: 3.05 },
+            { x: 18.3, y: 6.10 },
+            { x: 14.7, y: 9.14 },
+            { x: 10.2, y: 12.19 }
+          );
+        }
+
+        Highcharts.chart('depth-chart', {
+          chart: {
+            type: 'line'
+          },
+          title: {
+            text: 'Temperature Profile (°C vs Depth)'
+          },
+          xAxis: {
+            title: {
+              text: 'Temperature (°C)'
+            },
+            reversed: false
+          },
+          yAxis: {
+            title: {
+              text: 'Depth (m)'
+            },
+            reversed: true,
+            plotBands: [
+              {
+                from: 0,
+                to: 6.1,
+                color: 'rgba(255, 255, 200, 0.3)',
+                label: {
+                  text: 'Mixed Layer',
+                  align: 'right',
+                  x: -10,
+                  style: { color: '#666', fontWeight: 'bold' }
+                }
+              },
+              {
+                from: 6.1,
+                to: 15,
+                color: 'rgba(173, 216, 230, 0.3)',
+                label: {
+                  text: 'Thermocline',
+                  align: 'right',
+                  x: -10,
+                  style: { color: '#666', fontWeight: 'bold' }
+                }
+              }
+            ]
+          },
+          tooltip: {
+            pointFormat: 'Temperature: <b>{point.x}°C</b><br/>Depth: <b>{point.y} m</b>'
+          },
+          series: [{
+            name: 'Temperature',
+            data: profile,
+            color: '#e63946',
+            marker: {
+              enabled: true,
+              symbol: 'circle',
+              radius: 4
+            },
+            lineWidth: 3
+          }]
+        });
+
+      } catch (err) {
+        console.error('Fetch error:', err);
+        alert("Error fetching data. See console for details.");
+      }
+    }
+  </script>
+
+</body>
+</html>
