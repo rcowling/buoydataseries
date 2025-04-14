@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sensor Data Filter</title>
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    label { margin-right: 10px; }
+    table { margin-top: 20px; border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+  </style>
+</head>
+<body>
+  <h2>SPOT-30363R Data Viewer Example</h2>
+
+  <label for="sensor">Sensor:</label>
+  <select id="sensor">
+    <option value="1">Sensor 1</option>
+    <option value="2">Sensor 2</option>
+    <option value="3">Sensor 3</option>
+    <option value="4">Sensor 4</option>
+  </select>
+
+  <label for="type">Data Type:</label>
+  <select id="type">
+    <option value="temperature">Water Temperature</option>
+    <option value="pressure">Pressure</option>
+  </select>
+
+  <label for="start">Start Date:</label>
+  <input type="datetime-local" id="start" value="2024-12-01T07:00">
+
+  <label for="end">End Date:</label>
+  <input type="datetime-local" id="end" value="2024-12-02T07:00">
+
+  <button onclick="loadData()">Load Data</button>
+
+  <div id="chart" style="height: 400px; margin-top: 40px;"></div>
+
+  <table id="data-table">
+    <thead><tr><th>Timestamp</th><th>Value</th><th>Units</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    async function loadData() {
+      const sensor = parseInt(document.getElementById('sensor').value);
+      const type = document.getElementById('type').value;
+      const start = new Date(document.getElementById('start').value).toISOString();
+      const end = new Date(document.getElementById('end').value).toISOString();
+
+      const url = `https://api.sofarocean.com/api/sensor-data?spotterId=SPOT-30363R&startDate=${start}&endDate=${end}&token=9b5b0e8377a2805157c883a7f9d7b3`;
+
+      try {
+        const res = await fetch(url);
+        const json = await res.json();
+
+        const filtered = json.data.filter(d =>
+          d.sensorPosition === sensor && d.unit_type === type
+        );
+
+        console.log(filtered);
+
+        // Update Table
+        const tbody = document.querySelector('#data-table tbody');
+        tbody.innerHTML = '';
+        filtered.forEach(d => {
+          const row = `<tr><td>${d.timestamp}</td><td>${d.value}</td><td>${d.units}</td></tr>`;
+          tbody.insertAdjacentHTML('beforeend', row);
+        });
+
+        // Update Chart
+        const chartData = filtered.map(d => [new Date(d.timestamp).getTime(), d.value]);
+        Highcharts.chart('chart', {
+          title: { text: `SPOT-30363R Sensor ${sensor} - ${type}` },
+          xAxis: { type: 'datetime' },
+          yAxis: { title: { text: type } },
+          series: [{
+            name: type,
+            data: chartData
+          }]
+        });
+
+      } catch (err) {
+        console.error('Error fetching data', err);
+      }
+    }
+
+    // Auto-load on first page load
+    window.addEventListener('load', loadData);
+  </script>
+</body>
+</html>
