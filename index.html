@@ -12,7 +12,7 @@
   </style>
 </head>
 <body>
-  <h2>SPOT-30363R Data Viewer Example</h2>
+  <h2>Sensor Data Viewer</h2>
 
   <label for="sensor">Sensor:</label>
   <select id="sensor">
@@ -20,11 +20,12 @@
     <option value="2">Sensor 2</option>
     <option value="3">Sensor 3</option>
     <option value="4">Sensor 4</option>
+    <option value="all">All Sensors</option>
   </select>
 
   <label for="type">Data Type:</label>
   <select id="type">
-    <option value="temperature">Water Temperature</option>
+    <option value="temperature">Temperature</option>
     <option value="pressure">Pressure</option>
   </select>
 
@@ -39,13 +40,13 @@
   <div id="chart" style="height: 400px; margin-top: 40px;"></div>
 
   <table id="data-table">
-    <thead><tr><th>Timestamp</th><th>Value</th><th>Units</th></tr></thead>
+    <thead><tr><th>Sensor</th><th>Timestamp</th><th>Value</th><th>Units</th></tr></thead>
     <tbody></tbody>
   </table>
 
   <script>
     async function loadData() {
-      const sensor = parseInt(document.getElementById('sensor').value);
+      const sensorVal = document.getElementById('sensor').value;
       const type = document.getElementById('type').value;
       const start = new Date(document.getElementById('start').value).toISOString();
       const end = new Date(document.getElementById('end').value).toISOString();
@@ -55,39 +56,64 @@
       try {
         const res = await fetch(url);
         const json = await res.json();
+        const allData = json.data.filter(d => d.unit_type === type);
 
-        const filtered = json.data.filter(d =>
-          d.sensorPosition === sensor && d.unit_type === type
-        );
-
-        console.log(filtered);
-
-        // Update Table
         const tbody = document.querySelector('#data-table tbody');
         tbody.innerHTML = '';
-        filtered.forEach(d => {
-          const row = `<tr><td>${d.timestamp}</td><td>${d.value}</td><td>${d.units}</td></tr>`;
-          tbody.insertAdjacentHTML('beforeend', row);
-        });
 
-        // Update Chart
-        const chartData = filtered.map(d => [new Date(d.timestamp).getTime(), d.value]);
-        Highcharts.chart('chart', {
-          title: { text: `SPOT-30363R Sensor ${sensor} - ${type}` },
-          xAxis: { type: 'datetime' },
-          yAxis: { title: { text: type } },
-          series: [{
-            name: type,
-            data: chartData
-          }]
-        });
+        if (sensorVal === 'all' && type === 'temperature') {
+          // Group data by sensorPosition for charting
+          const grouped = {};
+          for (let i = 1; i <= 4; i++) {
+            grouped[i] = allData.filter(d => d.sensorPosition === i);
+          }
+
+          const series = [];
+          for (let sensor in grouped) {
+            const sensorData = grouped[sensor];
+            series.push({
+              name: `Sensor ${sensor}`,
+              data: sensorData.map(d => [new Date(d.timestamp).getTime(), d.value])
+            });
+
+            // Add to table
+            sensorData.forEach(d => {
+              const row = `<tr><td>${sensor}</td><td>${d.timestamp}</td><td>${d.value}</td><td>${d.units}</td></tr>`;
+              tbody.insertAdjacentHTML('beforeend', row);
+            });
+          }
+
+          Highcharts.chart('chart', {
+            title: { text: 'All Temperature Sensors' },
+            xAxis: { type: 'datetime' },
+            yAxis: { title: { text: 'Temperature' } },
+            series
+          });
+
+        } else {
+          const sensor = parseInt(sensorVal);
+          const filtered = allData.filter(d => d.sensorPosition === sensor);
+
+          filtered.forEach(d => {
+            const row = `<tr><td>${sensor}</td><td>${d.timestamp}</td><td>${d.value}</td><td>${d.units}</td></tr>`;
+            tbody.insertAdjacentHTML('beforeend', row);
+          });
+
+          const chartData = filtered.map(d => [new Date(d.timestamp).getTime(), d.value]);
+          Highcharts.chart('chart', {
+            title: { text: `Sensor ${sensor} - ${type}` },
+            xAxis: { type: 'datetime' },
+            yAxis: { title: { text: type } },
+            series: [{ name: `Sensor ${sensor}`, data: chartData }]
+          });
+        }
 
       } catch (err) {
         console.error('Error fetching data', err);
       }
     }
 
-    // Auto-load on first page load
+    // Load on startup
     window.addEventListener('load', loadData);
   </script>
 </body>
